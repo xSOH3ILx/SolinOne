@@ -109,7 +109,7 @@ fun CalendarScreen() {
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             // Selected Day Details Card
             Card(
