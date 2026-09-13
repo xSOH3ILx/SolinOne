@@ -47,12 +47,17 @@ object FinanceSmsDetector {
             return null
         }
 
-        // Gate 2: Direction Resolution
-        val isExpense = EXPENSE_KEYWORDS.any { normalized.contains(it) } || normalized.contains("-")
-        val isIncome = INCOME_KEYWORDS.any { normalized.contains(it) } || normalized.contains("+")
+        // Gate 2: Direction Resolution (keyword closest to first amount / explicit keyword search)
+        val expenseIndex = EXPENSE_KEYWORDS.map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: -1
+        val incomeIndex = INCOME_KEYWORDS.map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: -1
 
-        if (!isExpense && !isIncome) return null
-        val type = if (isExpense) TransactionType.EXPENSE else TransactionType.INCOME
+        val type = when {
+            incomeIndex >= 0 && (expenseIndex < 0 || incomeIndex < expenseIndex) -> TransactionType.INCOME
+            expenseIndex >= 0 -> TransactionType.EXPENSE
+            normalized.contains("+") -> TransactionType.INCOME
+            normalized.contains("-") -> TransactionType.EXPENSE
+            else -> return null
+        }
 
         // Gate 3: Extract Amount
         val matcher = GROUPED_NUMBER_PATTERN.matcher(normalized)
