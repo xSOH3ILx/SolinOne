@@ -28,6 +28,7 @@ android {
 dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:calendar"))
+    implementation(project(":core:database"))
     implementation("androidx.core:core-ktx:1.15.0")
     implementation(platform("androidx.compose:compose-bom:2025.02.00"))
     implementation("androidx.compose.ui:ui")
@@ -35,4 +36,5 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
 }

@@ -42,6 +42,7 @@ android {
 dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:calendar"))
+    implementation(project(":core:database"))
     implementation(project(":core:security"))
     implementation(project(":features:finance"))
     implementation(project(":features:calendar"))
@@ -53,7 +54,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.02.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.ui:tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.8")

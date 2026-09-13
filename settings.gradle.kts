@@ -17,6 +17,7 @@ rootProject.name = "SolinOne"
 include(":app")
 include(":core:ui")
 include(":core:calendar")
+include(":core:database")
 include(":core:security")
 include(":features:finance")
 include(":features:calendar")

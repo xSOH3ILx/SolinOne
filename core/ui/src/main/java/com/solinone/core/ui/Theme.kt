@@ -4,8 +4,11 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 private val DarkColorScheme = darkColorScheme(
     primary = Color(0xFF6C63FF),
@@ -54,7 +57,11 @@ fun SolinOneTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = AppTypography,
-        content = content
-    )
+        typography = AppTypography
+    ) {
+        // Enforce strict Right-to-Left (RTL) across all screens and components
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            content()
+        }
+    }
 }
