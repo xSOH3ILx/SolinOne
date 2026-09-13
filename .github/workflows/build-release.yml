@@ -35,26 +35,23 @@ jobs:
       - name: Run JVM Unit Tests
         run: ./gradlew test --stacktrace
 
-      - name: Build Debug & Release APKs
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+      - name: Build Official Signed Release APK
+        run: |
+          ./gradlew assembleRelease --stacktrace
+          mkdir -p release_dist
+          cp app/build/outputs/apk/release/app-release.apk release_dist/SolinOne.apk
 
-      - name: Upload Debug APK Artifact
+      - name: Upload Official Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SolinOne-Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
-
-      - name: Upload Release APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SolinOne-Release-APK
-          path: app/build/outputs/apk/release/*.apk
+          name: SolinOne-Official-APK
+          path: release_dist/SolinOne.apk
 
       - name: Create GitHub Release on Tag
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: "SolinOne ${{ github.ref_name }}"
           files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+            release_dist/SolinOne.apk
           generate_release_notes: true

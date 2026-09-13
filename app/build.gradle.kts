@@ -12,15 +12,28 @@ android {
         applicationId = "com.solinone.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-alpha.1"
+        versionCode = 2
+        versionName = "0.1.0-alpha.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootProject.file("keystore/solinone-release.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "SolinOne@Release2026"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "solinone"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "SolinOne@Release2026"
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

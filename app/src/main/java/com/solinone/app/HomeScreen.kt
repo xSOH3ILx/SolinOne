@@ -33,6 +33,7 @@ fun HomeScreen(
     val totalExpense by db.transactionDao().getTotalExpense().collectAsState(initial = 0L)
     val pendingObligations by db.obligationDao().getPendingObligations().collectAsState(initial = emptyList())
     val pendingTransactions by db.transactionDao().getPendingReviewTransactions().collectAsState(initial = emptyList())
+    val todayEvents by db.calendarEventDao().getEventsForDay(today.year, today.month, today.day).collectAsState(initial = emptyList())
 
     val currentBalance = (totalIncome ?: 0L) - (totalExpense ?: 0L)
 
@@ -90,9 +91,16 @@ fun HomeScreen(
                         )
 
                         val statusText = when {
-                            pendingTransactions.isNotEmpty() -> "${pendingTransactions.size} تراکنش جدید بانکی منتظر تأیید شماست.".toPersianDigits()
-                            pendingObligations.isNotEmpty() -> "${pendingObligations.size} تعهد مالی سررسید نشده دارید.".toPersianDigits()
-                            else -> "امروز هیچ یادآوری یا سررسید مالی ثبت‌نشده‌ای ندارید."
+                            todayEvents.isNotEmpty() && pendingTransactions.isNotEmpty() ->
+                                "${todayEvents.size} رویداد تقویم و ${pendingTransactions.size} پیامک بانکی برای بررسی دارید.".toPersianDigits()
+                            todayEvents.isNotEmpty() ->
+                                "${todayEvents.size} رویداد یا یادداشت برای امروز ثبت شده است: ${todayEvents.first().title}".toPersianDigits()
+                            pendingTransactions.isNotEmpty() ->
+                                "${pendingTransactions.size} تراکنش جدید بانکی منتظر تأیید شماست.".toPersianDigits()
+                            pendingObligations.isNotEmpty() ->
+                                "${pendingObligations.size} تعهد مالی سررسید نشده دارید.".toPersianDigits()
+                            else ->
+                                "امروز هیچ یادآوری، رویداد یا سررسید مالی ثبت‌نشده‌ای ندارید."
                         }
 
                         Text(
