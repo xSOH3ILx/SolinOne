@@ -12,8 +12,8 @@ android {
         applicationId = "com.solinone.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.1.0-alpha.6"
+        versionCode = 7
+        versionName = "0.1.0-alpha.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,12 +21,12 @@ android {
     signingConfigs {
         create("release") {
             val keystoreFile = rootProject.file("keystore/solinone-release.jks")
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "SolinOne@Release2026"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "solinone"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "SolinOne@Release2026"
-            }
+            storeFile = keystoreFile
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "SolinOne@Release2026"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "solinone"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "SolinOne@Release2026"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 

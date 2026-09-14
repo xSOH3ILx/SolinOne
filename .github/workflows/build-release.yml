@@ -40,6 +40,15 @@ jobs:
           ./gradlew assembleRelease --stacktrace
           mkdir -p release_dist
           cp app/build/outputs/apk/release/app-release.apk release_dist/SolinOne.apk
+          
+          # Verify signature or apply apksigner if not signed
+          if ! $ANDROID_HOME/build-tools/35.0.0/apksigner verify release_dist/SolinOne.apk 2>/dev/null; then
+            echo "Signing with apksigner fallback..."
+            $ANDROID_HOME/build-tools/35.0.0/apksigner sign --ks keystore/solinone-release.jks --ks-key-alias solinone --ks-pass pass:SolinOne@Release2026 --key-pass pass:SolinOne@Release2026 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true release_dist/SolinOne.apk
+          fi
+          
+          echo "=== Verifying Final APK Signature ==="
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose release_dist/SolinOne.apk
 
       - name: Upload Official Release APK Artifact
         uses: actions/upload-artifact@v4
