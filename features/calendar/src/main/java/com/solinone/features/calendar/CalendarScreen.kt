@@ -1,7 +1,12 @@
 package com.solinone.features.calendar
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,18 +18,22 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.solinone.core.calendar.Jdn
 import com.solinone.core.calendar.PersianDate
 import com.solinone.core.calendar.toPersianDigits
+import com.solinone.core.database.CalendarEventsInitializer
 import com.solinone.core.database.SolinOneDatabase
 import com.solinone.core.database.entity.CalendarEventEntity
 import kotlinx.coroutines.Dispatchers
@@ -39,9 +48,15 @@ fun CalendarScreen(
     val db = remember { SolinOneDatabase.getDatabase(context) }
     val scope = rememberCoroutineScope()
 
+    // Populate official Iran events from assets into Room on first launch
+    LaunchedEffect(Unit) {
+        CalendarEventsInitializer.populateEventsIfNeeded(context, db)
+    }
+
     var selectedDate by remember { mutableStateOf(PersianDate.today()) }
     var currentYear by remember { mutableIntStateOf(selectedDate.year) }
     var currentMonth by remember { mutableIntStateOf(selectedDate.month) }
+    var isSlidingForward by remember { mutableStateOf(true) }
 
     // Observe events for selected month from Room
     val monthEvents by db.calendarEventDao().getEventsForMonth(currentYear, currentMonth).collectAsState(initial = emptyList())
@@ -56,14 +71,32 @@ fun CalendarScreen(
         currentMonth in 1..6 -> 31
         currentMonth in 7..11 -> 30
         else -> {
-            // Month 12: 30 days if leap, else 29
             val jdnEnd = Jdn.fromPersian(currentYear, 12, 30)
             if (jdnEnd.toPersian().first == currentYear) 30 else 29
         }
     }
 
-    // First day of this month in Persian week: Saturday=0 .. Friday=6
     val firstDayOfWeek = Jdn.fromPersian(currentYear, currentMonth, 1).getDayOfWeek()
+
+    fun navigateToNextMonth() {
+        isSlidingForward = true
+        if (currentMonth == 12) {
+            currentMonth = 1
+            currentYear++
+        } else {
+            currentMonth++
+        }
+    }
+
+    fun navigateToPreviousMonth() {
+        isSlidingForward = false
+        if (currentMonth == 1) {
+            currentMonth = 12
+            currentYear--
+        } else {
+            currentMonth--
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -75,6 +108,16 @@ fun CalendarScreen(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "بازگشت"
                         )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = {
+                        val today = PersianDate.today()
+                        selectedDate = today
+                        currentYear = today.year
+                        currentMonth = today.month
+                    }) {
+                        Text("امروز", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -102,7 +145,7 @@ fun CalendarScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Month Header with Navigation
+            // Month Header with Navigation Buttons
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -116,14 +159,7 @@ fun CalendarScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = {
-                            if (currentMonth == 12) {
-                                currentMonth = 1
-                                currentYear++
-                            } else {
-                                currentMonth++
-                            }
-                        }) {
+                        IconButton(onClick = { navigateToNextMonth() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "ماه بعد")
                         }
                         Text(
@@ -131,21 +167,14 @@ fun CalendarScreen(
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        IconButton(onClick = {
-                            if (currentMonth == 1) {
-                                currentMonth = 12
-                                currentYear--
-                            } else {
-                                currentMonth--
-                            }
-                        }) {
+                        IconButton(onClick = { navigateToPreviousMonth() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "ماه قبل")
                         }
                     }
                 }
             }
 
-            // Weekday Headers (Saturday to Friday in Persian order)
+            // Weekday Headers (ش تا ج در ترتیب تقویم فارسی)
             item {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     val weekDays = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
@@ -154,78 +183,142 @@ fun CalendarScreen(
                             text = day,
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (day == "ج") Color.Red else MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (day == "ج") Color(0xFFE53935) else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
             }
 
-            // Month Grid
+            // Month Days Grid with Animated Swipe Gesture (RTL Native Direction)
             item {
-                val totalCells = firstDayOfWeek + daysInMonth
-                val totalRows = (totalCells + 6) / 7
+                var totalDrag by remember { mutableFloatStateOf(0f) }
 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (row in 0 until totalRows) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            for (col in 0 until 7) {
-                                val cellIndex = row * 7 + col
-                                val dayNumber = cellIndex - firstDayOfWeek + 1
-                                if (dayNumber in 1..daysInMonth) {
-                                    val isSelected = selectedDate.year == currentYear &&
-                                            selectedDate.month == currentMonth &&
-                                            selectedDate.day == dayNumber
-                                    val isToday = PersianDate.today().let {
-                                        it.year == currentYear && it.month == currentMonth && it.day == dayNumber
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(currentYear, currentMonth) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    // In RTL: Drag to right (totalDrag > 60) moves forward to next month
+                                    // Drag to left (totalDrag < -60) moves backward to previous month
+                                    if (totalDrag > 60) {
+                                        navigateToNextMonth()
+                                    } else if (totalDrag < -60) {
+                                        navigateToPreviousMonth()
                                     }
-                                    val hasEvent = monthEvents.any { it.persianDay == dayNumber }
+                                    totalDrag = 0f
+                                },
+                                onHorizontalDrag = { _, dragAmount ->
+                                    totalDrag += dragAmount
+                                }
+                            )
+                        }
+                ) {
+                    AnimatedContent(
+                        targetState = Pair(currentYear, currentMonth),
+                        transitionSpec = {
+                            if (isSlidingForward) {
+                                slideInHorizontally { width -> width } togetherWith slideOutHorizontally { width -> -width }
+                            } else {
+                                slideInHorizontally { width -> -width } togetherWith slideOutHorizontally { width -> width }
+                            }
+                        },
+                        label = "MonthGridAnimation"
+                    ) { (year, month) ->
+                        val currentDaysInMonth = when {
+                            month in 1..6 -> 31
+                            month in 7..11 -> 30
+                            else -> {
+                                val jdnEnd = Jdn.fromPersian(year, 12, 30)
+                                if (jdnEnd.toPersian().first == year) 30 else 29
+                            }
+                        }
+                        val currentFirstDay = Jdn.fromPersian(year, month, 1).getDayOfWeek()
+                        val totalCells = currentFirstDay + currentDaysInMonth
+                        val totalRows = (totalCells + 6) / 7
 
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .aspectRatio(1f)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when {
-                                                    isSelected -> MaterialTheme.colorScheme.primary
-                                                    isToday -> MaterialTheme.colorScheme.primaryContainer
-                                                    else -> Color.Transparent
-                                                }
-                                            )
-                                            .clickable {
-                                                selectedDate = PersianDate(currentYear, currentMonth, dayNumber)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                text = dayNumber.toString().toPersianDigits(),
-                                                color = when {
-                                                    isSelected -> Color.White
-                                                    col == 6 -> Color.Red // Friday
-                                                    else -> MaterialTheme.colorScheme.onSurface
-                                                },
-                                                style = MaterialTheme.typography.bodyLarge
-                                            )
-                                            if (hasEvent) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(4.dp)
-                                                        .clip(CircleShape)
-                                                        .background(if (isSelected) Color.White else MaterialTheme.colorScheme.secondary)
-                                                )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (row in 0 until totalRows) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    for (col in 0 until 7) {
+                                        val cellIndex = row * 7 + col
+                                        val dayNumber = cellIndex - currentFirstDay + 1
+                                        if (dayNumber in 1..currentDaysInMonth) {
+                                            val isSelected = selectedDate.year == year &&
+                                                    selectedDate.month == month &&
+                                                    selectedDate.day == dayNumber
+                                            val isToday = PersianDate.today().let {
+                                                it.year == year && it.month == month && it.day == dayNumber
                                             }
+                                            val eventsForCell = monthEvents.filter { it.persianDay == dayNumber }
+                                            val isHoliday = col == 6 || eventsForCell.any { it.isHoliday }
+                                            val hasCustomEvent = eventsForCell.any { !it.isHoliday && it.persianYear != 0 }
+                                            val hasOfficialEvent = eventsForCell.any { it.persianYear == 0 }
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .aspectRatio(1f)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        when {
+                                                            isSelected -> MaterialTheme.colorScheme.primary
+                                                            isToday -> MaterialTheme.colorScheme.primaryContainer
+                                                            else -> Color.Transparent
+                                                        }
+                                                    )
+                                                    .clickable {
+                                                        selectedDate = PersianDate(year, month, dayNumber)
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text(
+                                                        text = dayNumber.toString().toPersianDigits(),
+                                                        color = when {
+                                                            isSelected -> Color.White
+                                                            isHoliday -> Color(0xFFE53935)
+                                                            else -> MaterialTheme.colorScheme.onSurface
+                                                        },
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                    if (eventsForCell.isNotEmpty()) {
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            if (isHoliday) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(4.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(if (isSelected) Color.White else Color(0xFFE53935))
+                                                                )
+                                                            }
+                                                            if (hasCustomEvent || hasOfficialEvent) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(4.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(if (isSelected) Color.White else MaterialTheme.colorScheme.secondary)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f))
                                         }
                                     }
-                                } else {
-                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
@@ -239,47 +332,73 @@ fun CalendarScreen(
 
             // Selected Day Details Card
             item {
+                val jdnSelected = selectedDate.toJdn()
+                val (gy, gm, gd) = jdnSelected.toGregorian()
+                val isHolidayDay = selectedDate.toJdn().getDayOfWeek() == 6 || dayEvents.any { it.isHoliday }
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isHolidayDay) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = "اطلاعات روز انتخاب شده",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "اطلاعات روز انتخاب شده",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (isHolidayDay) Color(0xFFC62828) else MaterialTheme.colorScheme.primary
+                            )
+                            if (isHolidayDay) {
+                                Surface(
+                                    color = Color(0xFFFFCDD2),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "تعطیل رسمی",
+                                        color = Color(0xFFB71C1C),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = "${selectedDate.dayOfWeekName}، ${selectedDate.day} ${selectedDate.monthName} ${selectedDate.year}".toPersianDigits(),
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = if (isHolidayDay) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "معادل میلادی: $gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')}".toPersianDigits(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            // Events for this Selected Day
+            // Events for this Selected Day (Official & Custom)
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "رویدادها و یادداشت‌های این روز (${dayEvents.size})".toPersianDigits(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                Text(
+                    text = "مناسبت‌ها و رویدادهای این روز (${dayEvents.size})".toPersianDigits(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             if (dayEvents.isEmpty()) {
                 item {
                     Text(
-                        text = "هیچ رویداد یا یادداشتی برای این تاریخ ثبت نشده است. با زدن دکمه + می‌توانید رویداد جدید اضافه کنید.",
+                        text = "هیچ مناسبت رسمی یا یادداشت شخصی برای این روز ثبت نشده است. با زدن دکمه + می‌توانید رویداد جدید اضافه کنید.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -288,7 +407,10 @@ fun CalendarScreen(
                 items(dayEvents, key = { it.id }) { event ->
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = if (event.isHoliday) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surface
+                        )
                     ) {
                         Row(
                             modifier = Modifier
@@ -303,12 +425,17 @@ fun CalendarScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.EventNote,
+                                    if (event.isHoliday) Icons.Default.Star else Icons.Default.EventNote,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = if (event.isHoliday) Color(0xFFC62828) else MaterialTheme.colorScheme.primary
                                 )
                                 Column {
-                                    Text(text = event.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(
+                                        text = event.title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = if (event.isHoliday) Color(0xFFB71C1C) else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (event.isHoliday) FontWeight.Bold else FontWeight.Normal
+                                    )
                                     if (event.description.isNotEmpty()) {
                                         Text(
                                             text = event.description,
@@ -318,12 +445,14 @@ fun CalendarScreen(
                                     }
                                 }
                             }
-                            IconButton(onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    db.calendarEventDao().deleteEventById(event.id)
+                            if (event.persianYear != 0) { // Only allow deleting user-created custom events
+                                IconButton(onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        db.calendarEventDao().deleteEventById(event.id)
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                                 }
-                            }) {
-                                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
