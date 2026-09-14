@@ -18,6 +18,9 @@ interface TransactionDao {
     @Query("SELECT SUM(amountRial) FROM transactions WHERE type = 'EXPENSE' AND isPendingReview = 0")
     fun getTotalExpense(): Flow<Long?>
 
+    @Query("SELECT category, SUM(amountRial) as totalAmount, COUNT(*) as count FROM transactions WHERE type = :type AND isPendingReview = 0 GROUP BY category ORDER BY totalAmount DESC")
+    fun getCategorySummaries(type: String = "EXPENSE"): Flow<List<CategorySummary>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: TransactionEntity): Long
 
