@@ -226,17 +226,16 @@ fun CalendarScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 16.dp)
-                            .detectHorizontalSwipe(key1 = "$currentYear-$currentMonth") { isLeft ->
-                                // In RTL layout: swipe left goes to next month, swipe right goes to previous month
-                                if (isLeft) navigateToNextMonth() else navigateToPreviousMonth()
+                            .detectHorizontalSwipe(key1 = "$currentYear-$currentMonth") {
+                                { isLeft: Boolean ->
+                                    if (isLeft) navigateToNextMonth() else navigateToPreviousMonth()
+                                }
                             }
                             .detectSwipe {
-                                { isUp ->
+                                { isUp: Boolean ->
                                     if (isUp) {
-                                        // Swipe up switches to Schedule
                                         viewMode = CalendarViewMode.SCHEDULE
                                     } else {
-                                        // Swipe down switches to Year View
                                         viewMode = CalendarViewMode.YEAR
                                     }
                                 }

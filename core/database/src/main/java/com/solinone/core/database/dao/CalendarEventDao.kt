@@ -12,6 +12,9 @@ interface CalendarEventDao {
     @Query("SELECT * FROM calendar_events WHERE (persianYear = :year OR persianYear = 0) AND persianMonth = :month AND persianDay = :day ORDER BY isHoliday DESC, id ASC")
     fun getEventsForDay(year: Int, month: Int, day: Int): Flow<List<CalendarEventEntity>>
 
+    @Query("SELECT * FROM calendar_events ORDER BY persianMonth ASC, persianDay ASC")
+    fun getAllEvents(): Flow<List<CalendarEventEntity>>
+
     @Query("SELECT COUNT(*) FROM calendar_events")
     suspend fun getEventCount(): Int
 
