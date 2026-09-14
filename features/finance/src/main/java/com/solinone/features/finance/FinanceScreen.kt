@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -17,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.solinone.core.calendar.PersianDate
+import com.solinone.core.calendar.toPersianDigits
 import com.solinone.core.calendar.toPersianTomanFormatted
 import com.solinone.core.database.SolinOneDatabase
 import com.solinone.core.database.entity.TransactionEntity
@@ -26,7 +29,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanceScreen(
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val db = remember { SolinOneDatabase.getDatabase(context) }
@@ -39,10 +42,24 @@ fun FinanceScreen(
 
     val currentBalance = (totalIncome ?: 0L) - (totalExpense ?: 0L)
 
+    var showAddDialog by remember { mutableStateOf(false) }
+    var txAmountToman by remember { mutableStateOf("") }
+    var txCategory by remember { mutableStateOf("") }
+    var txNote by remember { mutableStateOf("") }
+    var txType by remember { mutableStateOf("EXPENSE") } // EXPENSE or INCOME
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("مدیریت مالی آرا (Ara)") },
+                title = { Text("مدیریت مالی SolinOne") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "بازگشت"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -51,20 +68,11 @@ fun FinanceScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    // Seed sample test manual transaction
-                    scope.launch(Dispatchers.IO) {
-                        db.transactionDao().insertTransaction(
-                            TransactionEntity(
-                                amountRial = 50000000L,
-                                type = "INCOME",
-                                category = "واریز حقوق",
-                                note = "ثبت دستی",
-                                timestamp = System.currentTimeMillis(),
-                                persianDate = "1403/06/23",
-                                isPendingReview = false
-                            )
-                        )
-                    }
+                    txAmountToman = ""
+                    txCategory = ""
+                    txNote = ""
+                    txType = "EXPENSE"
+                    showAddDialog = true
                 },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
@@ -125,11 +133,11 @@ fun FinanceScreen(
                 }
             }
 
-            // Pending Review Queue
+            // Pending Review Queue (صف بازبینی پیامک‌های بانکی)
             if (pendingTransactions.isNotEmpty()) {
                 item {
                     Text(
-                        text = "صف بازبینی پیامک‌های بانکی (${pendingTransactions.size})",
+                        text = "صف بازبینی پیامک‌های بانکی (${pendingTransactions.size})".toPersianDigits(),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -153,7 +161,7 @@ fun FinanceScreen(
                                     style = MaterialTheme.typography.titleSmall
                                 )
                                 Surface(
-                                    color = Color(0xFFE8F5E9),
+                                    color = if (item.type == "INCOME") Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
@@ -189,7 +197,7 @@ fun FinanceScreen(
                                 }) {
                                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("تأیید و افزودن")
+                                    Text("تأیید و ثبت")
                                 }
                             }
                         }
@@ -200,7 +208,7 @@ fun FinanceScreen(
             // Confirmed Transactions History
             item {
                 Text(
-                    text = "آخرین تراکنش‌های ثبت‌شده",
+                    text = "تاریخچه تراکنش‌های ثبت‌شده",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -209,7 +217,7 @@ fun FinanceScreen(
             if (confirmedTransactions.isEmpty()) {
                 item {
                     Text(
-                        text = "هنوز هیچ تراکنشی ثبت نشده است. پیامک‌های بانکی به محض دریافت در صف بازبینی ظاهر می‌شوند.",
+                        text = "هنوز هیچ تراکنشی ثبت نشده است. پیامک‌های بانکی به محض دریافت در صف بازبینی ظاهر می‌شوند و همچنین با دکمه + می‌توانید دستی تراکنش اضافه کنید.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -227,7 +235,11 @@ fun FinanceScreen(
                         ) {
                             Column {
                                 Text(text = tx.category, style = MaterialTheme.typography.titleSmall)
-                                Text(text = tx.persianDate, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = "${tx.persianDate.toPersianDigits()} ${if (tx.note.isNotEmpty()) "• ${tx.note}" else ""}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                             Text(
                                 text = (if (tx.type == "INCOME") "+ " else "- ") + tx.amountRial.toPersianTomanFormatted(),
@@ -239,5 +251,88 @@ fun FinanceScreen(
                 }
             }
         }
+    }
+
+    // Add Manual Transaction Dialog
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("ثبت دستی تراکنش جدید") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = txType == "EXPENSE",
+                            onClick = { txType = "EXPENSE" },
+                            label = { Text("هزینه / برداشت") }
+                        )
+                        FilterChip(
+                            selected = txType == "INCOME",
+                            onClick = { txType = "INCOME" },
+                            label = { Text("درآمد / واریز") }
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = txAmountToman,
+                        onValueChange = { txAmountToman = it },
+                        label = { Text("مبلغ به تومان") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = txCategory,
+                        onValueChange = { txCategory = it },
+                        label = { Text("دسته‌بندی (مثلاً خوراکی، حقوق، بنزین)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = txNote,
+                        onValueChange = { txNote = it },
+                        label = { Text("یادداشت (اختیاری)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amountToman = txAmountToman.toLongOrNull() ?: 0L
+                        if (amountToman > 0 && txCategory.isNotBlank()) {
+                            scope.launch(Dispatchers.IO) {
+                                db.transactionDao().insertTransaction(
+                                    TransactionEntity(
+                                        amountRial = amountToman * 10,
+                                        type = txType,
+                                        category = txCategory.trim(),
+                                        note = txNote.trim(),
+                                        timestamp = System.currentTimeMillis(),
+                                        persianDate = PersianDate.today().formatPersian(false),
+                                        isPendingReview = false
+                                    )
+                                )
+                            }
+                            showAddDialog = false
+                        }
+                    }
+                ) {
+                    Text("ذخیره")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
     }
 }

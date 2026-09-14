@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -17,7 +18,9 @@ import com.solinone.core.calendar.toPersianDigits
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onNavigateBack: () -> Unit = {}
+) {
     var biometricEnabled by remember { mutableStateOf(true) }
     var amoledTheme by remember { mutableStateOf(false) }
     var blurRecentApps by remember { mutableStateOf(true) }
@@ -26,6 +29,14 @@ fun SettingsScreen() {
         topBar = {
             TopAppBar(
                 title = { Text("تنظیمات SolinOne") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "بازگشت"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -70,7 +81,7 @@ fun SettingsScreen() {
                             Switch(checked = biometricEnabled, onCheckedChange = { biometricEnabled = it })
                         }
 
-                        Divider(modifier = Modifier.padding(vertical = 12.dp))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -147,7 +158,7 @@ fun SettingsScreen() {
                         Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column {
                             Text("نسخه SolinOne", style = MaterialTheme.typography.titleSmall)
-                            Text("نسخه 0.1.0-alpha.2 (کد بیلد: 2)".toPersianDigits(), style = MaterialTheme.typography.bodySmall)
+                            Text("نسخه 0.1.0-alpha.3 (کد بیلد: 3)".toPersianDigits(), style = MaterialTheme.typography.bodySmall)
                             Text("تحت لایسنس عمومی GPL-3.0", style = MaterialTheme.typography.labelSmall)
                         }
                     }
