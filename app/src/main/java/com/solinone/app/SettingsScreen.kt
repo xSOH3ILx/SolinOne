@@ -158,7 +158,7 @@ fun SettingsScreen(
                         Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Column {
                             Text("نسخه SolinOne", style = MaterialTheme.typography.titleSmall)
-                            Text("نسخه 0.1.0-alpha.5 (کد بیلد: 5)".toPersianDigits(), style = MaterialTheme.typography.bodySmall)
+                            Text("نسخه 0.1.0-alpha.6 (کد بیلد: 6)".toPersianDigits(), style = MaterialTheme.typography.bodySmall)
                             Text("تحت لایسنس عمومی GPL-3.0", style = MaterialTheme.typography.labelSmall)
                         }
                     }

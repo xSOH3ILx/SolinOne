@@ -27,4 +27,13 @@ class CalendarEngineTest {
         val expected = "۱۴۰۳/۰۱/۰۱ - ۵۰,۰۰۰"
         assertEquals(expected, input.toPersianDigits())
     }
+    @Test
+    fun testIslamicConversion() {
+        // 1403/1/1 = 2024-03-20 = 1445/09/09 Ramadan
+        val jdn = Jdn.fromPersian(1403, 1, 1)
+        val islamic = IslamicDate.fromJdn(jdn)
+        assertEquals(1445, islamic.year)
+        assertEquals(9, islamic.month)
+        assertEquals(9, islamic.day)
+    }
 }
