@@ -225,7 +225,6 @@ internal object IranianIslamicDateConverter {
             /*1448*/ 0b1_0_1_0_1_1_1_0_1_____0_1_0,
             /*1449*/ 0b1_0_0_1_0_1_0_1_1_1_0_0,
         )
-        )
         supportedYears = hijriMonths.size
         months = IntArray(hijriMonths.size * 12)
         var jd = 0
